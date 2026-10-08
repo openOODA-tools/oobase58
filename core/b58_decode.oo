@@ -1,0 +1,82 @@
+// # oobase58 Decoding Engine
+//
+// Logline: Decodes Base58 character sequences into original byte strings with strict validation.
+//
+// Setup: Pure arbitrary-precision base-58 to base-256 unpacking with leading zero preservation.
+//
+// Beats:
+//   1. Filter whitespace and count leading zero-symbol glyphs.
+//   2. Accumulate base-58 digit values into base-256 byte array.
+//   3. Validate symbols against active alphabet and construct owned byte buffer.
+
+import "core/b58_alphabet.oo";
+
+pub fn b58_decode_stream(s: String, alphabet: String) -> Result[String, String] {
+    let n: Int = chars_len(s);
+    if n == 0 {
+        return Ok("");
+    }
+
+    let zero_char: String = b58_char_at(alphabet, 0);
+    let mut leading_zeros: Int = 0;
+    let mut scanning_zeros: Bool = true;
+    let mut i: Int = 0;
+
+    while i < n && scanning_zeros {
+        let c: String = char_at(s, i);
+        if c == " " || c == "\t" || c == "\r" || c == "\n" {
+            i = i + 1;
+        } else if c == zero_char {
+            leading_zeros = leading_zeros + 1;
+            i = i + 1;
+        } else {
+            scanning_zeros = false;
+        }
+    }
+
+    let mut byte_digits: List[Int] = list_new();
+    let mut k: Int = 0;
+
+    while k < n {
+        let c: String = char_at(s, k);
+        if c == " " || c == "\t" || c == "\r" || c == "\n" {
+            k = k + 1;
+        } else {
+            let val: Int = b58_val_of(alphabet, c);
+            if val < 0 {
+                return Err("invalid Base58 character: " + c);
+            }
+            let mut carry: Int = val;
+            let mut j: Int = 0;
+            let blen: Int = list_len(byte_digits);
+            while j < blen {
+                let acc: Int = (list_get(byte_digits, j) * 58) + carry;
+                byte_digits = list_set(byte_digits, j, acc % 256);
+                carry = acc / 256;
+                j = j + 1;
+            }
+            while carry > 0 {
+                byte_digits = list_push(byte_digits, carry % 256);
+                carry = carry / 256;
+            }
+            k = k + 1;
+        }
+    }
+
+    let mut buf: List[Int] = bytes_new();
+    let mut z: Int = 0;
+    while z < leading_zeros {
+        buf = bytes_push(buf, 0);
+        z = z + 1;
+    }
+
+    let total_bytes: Int = list_len(byte_digits);
+    let mut b_idx: Int = total_bytes - 1;
+    while b_idx >= 0 {
+        buf = bytes_push(buf, list_get(byte_digits, b_idx));
+        b_idx = b_idx - 1;
+    }
+
+    let res_str: String = bytes_to_str(buf);
+    return Ok(res_str);
+}

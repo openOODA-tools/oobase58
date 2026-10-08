@@ -1,0 +1,119 @@
+// # oobase58 CLI Options Parser
+//
+// Logline: Ingests command line arguments into typed Base58 execution options.
+//
+// Setup: Pure argument decoding for encode, decode, alphabet selection, and wrapping.
+//
+// Beats:
+//   1. Parse integers from decimal string sequences without ambient authority.
+//   2. Define B58Opts data structure covering all encoding and decoding modes.
+//   3. Extract flags for alphabet choice, wrap widths, and MCP mode.
+
+pub type B58Opts = struct {
+    action: String,
+    mode: String,
+    alphabet: String,
+    wrap_cols: Int,
+    input_text: String,
+    file_path: String,
+    json_mode: Bool
+};
+
+fn digit_value(c: String) -> Int {
+    if c == "0" { return 0; }
+    if c == "1" { return 1; }
+    if c == "2" { return 2; }
+    if c == "3" { return 3; }
+    if c == "4" { return 4; }
+    if c == "5" { return 5; }
+    if c == "6" { return 6; }
+    if c == "7" { return 7; }
+    if c == "8" { return 8; }
+    if c == "9" { return 9; }
+    return -1;
+}
+
+pub fn parse_int_str(s: String) -> Int {
+    let n: Int = chars_len(s);
+    let mut acc: Int = 0;
+    let mut i: Int = 0;
+    while i < n {
+        let d: Int = digit_value(char_at(s, i));
+        if d >= 0 {
+            acc = (acc * 10) + d;
+        }
+        i = i + 1;
+    }
+    return acc;
+}
+
+pub fn default_b58_opts() -> B58Opts {
+    return B58Opts {
+        action: "run",
+        mode: "encode",
+        alphabet: "bitcoin",
+        wrap_cols: 0,
+        input_text: "",
+        file_path: "",
+        json_mode: false
+    };
+}
+
+pub fn parse_b58_args(args: List[String]) -> B58Opts {
+    let mut opts: B58Opts = default_b58_opts();
+    let n: Int = list_len(args);
+    let mut i: Int = 0;
+    let mut words: List[String] = list_new();
+
+    while i < n {
+        let arg: String = list_get(args, i);
+        if arg == "-h" || arg == "--help" {
+            opts.action = "help";
+            return opts;
+        } else if arg == "-v" || arg == "--version" {
+            opts.action = "version";
+            return opts;
+        } else if arg == "--mcp" {
+            opts.action = "mcp";
+            return opts;
+        } else if arg == "--json" {
+            opts.json_mode = true;
+        } else if arg == "-d" || arg == "--decode" {
+            opts.mode = "decode";
+        } else if arg == "-e" || arg == "--encode" {
+            opts.mode = "encode";
+        } else if arg == "-a" || arg == "--alphabet" {
+            if i + 1 < n {
+                i = i + 1;
+                opts.alphabet = list_get(args, i);
+            }
+        } else if arg == "-w" || arg == "--wrap" {
+            if i + 1 < n {
+                i = i + 1;
+                opts.wrap_cols = parse_int_str(list_get(args, i));
+            }
+        } else if !str_starts_with(arg, "-") {
+            words = list_push(words, arg);
+        }
+        i = i + 1;
+    }
+
+    let w_count: Int = list_len(words);
+    if w_count > 0 {
+        let first: String = list_get(words, 0);
+        if w_count == 1 && (str_contains(first, "/") || str_ends_with(first, ".txt") || str_ends_with(first, ".b58")) {
+            opts.file_path = first;
+        } else {
+            let mut full: String = "";
+            let mut j: Int = 0;
+            while j < w_count {
+                if j > 0 { full = full + " "; }
+                full = full + list_get(words, j);
+                j = j + 1;
+            }
+            opts.input_text = full;
+        }
+    }
+
+    return opts;
+}

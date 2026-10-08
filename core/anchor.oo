@@ -1,0 +1,22 @@
+// # oobase58 Core Subsystem Anchor
+//
+// Logline: Consolidates Base58 alphabets, big-endian encoding, and decode unpacking engines.
+//
+// Setup: Root barrel shim for core Base58 binary-to-text transformation domain.
+//
+// Beats:
+//   1. Re-export Bitcoin, Ripple, and Flickr alphabet definitions and symbol lookups.
+//   2. Re-export arbitrary-precision Base58 encoder with leading zero preservation.
+//   3. Re-export Base58 decoder with character validation and byte reconstruction.
+
+import "core/b58_alphabet.oo";
+import "core/b58_encode.oo";
+import "core/b58_decode.oo";
+
+pub fn core_subsystem_version() -> String {
+    return "0.2.0";
+}
+
+pub fn core_subsystem_description() -> String {
+    return "oobase58 pure openOODA core codec subsystem";
+}

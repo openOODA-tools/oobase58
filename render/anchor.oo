@@ -1,0 +1,20 @@
+// # oobase58 Render Subsystem Anchor
+//
+// Logline: Consolidates terminal colorizers, status visualizers, and JSON serializers.
+//
+// Setup: Root barrel shim for Base58 output rendering and formatting domain.
+//
+// Beats:
+//   1. Re-export ANSI color styles and text formatting primitives.
+//   2. Re-export JSON serializers for encoding operations.
+//   3. Re-export JSON serializers for decoding validations and diagnostic reports.
+
+import "render/b58_theme.oo";
+
+pub fn render_subsystem_version() -> String {
+    return "0.2.0";
+}
+
+pub fn render_subsystem_description() -> String {
+    return "oobase58 pure openOODA render subsystem";
+}

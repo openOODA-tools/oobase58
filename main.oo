@@ -1,52 +1,103 @@
-// # oobase58 Main Entry Point
+// # oobase58 Main Entry Point - Sovereign Base58 Codec
 //
-// Logline: Cryptographic Base58 encoder and decoder omitting ambiguous alphanumeric glyphs.
+// Logline: Base58 encoder and decoder with Bitcoin, Ripple, and Flickr alphabet options.
 //
 // Setup: Demands explicit capability tokens and standard argument list.
 //
 // Beats:
 //   1. Parse command-line options and dispatch --help, --version, or --mcp.
-//   2. Execute capability-bounded oobase58 operations.
-//   3. Format and output structured results to standard output.
+//   2. Ingest payload from command line, referenced file, or standard input.
+//   3. Dispatch encoding or decoding transform and output plain or JSON text.
+
+import "core/b58_encode.oo";
+import "core/b58_decode.oo";
+import "render/b58_theme.oo";
+import "ipc/b58_opts.oo";
+import "ipc/mcp_serve.oo";
 
 fn render_help() -> String {
-    return "oobase58 0.1.0 (openOODA sovereign data & streaming)\n"
-        + "usage: oobase58 [options] [ARGUMENTS]...\n\n"
-        + "Cryptographic Base58 encoder and decoder omitting ambiguous alphanumeric glyphs.\n\n"
+    return "oobase58 0.2.0 (openOODA sovereign data & streaming)\n"
+        + "usage: oobase58 [options] [INPUT_OR_FILE]\n\n"
+        + "Base58 encoder and decoder with Bitcoin, Ripple, and Flickr alphabet options.\n\n"
         + "Options:\n"
-        + "  -h, --help           display this help and exit\n"
-        + "  -v, --version        output version information and exit\n"
-        + "      --json           output formatted as JSON Lines\n"
-        + "      --color <WHEN>   colorize output: auto, always, never [default: auto]\n"
-        + "      --theme <NAME>   override active oote palette\n"
-        + "      --mcp            run as Model Context Protocol stdio server\n";
+        + "  -h, --help               display this help and exit\n"
+        + "  -v, --version            output version information and exit\n"
+        + "  -d, --decode             decode data\n"
+        + "  -e, --encode             encode data (default)\n"
+        + "  -a, --alphabet <NAME>    alphabet: bitcoin, ripple, flickr [default: bitcoin]\n"
+        + "  -w, --wrap <COLS>        wrap encoded lines after COLS characters [default: 0]\n"
+        + "      --json               output formatted as JSON Lines\n"
+        + "      --mcp                run as Model Context Protocol stdio server\n";
 }
 
-fn render_version() -> String {
-    return "oobase58 0.1.0 (openOODA sovereign data & streaming)\n";
-}
+pub fn main(
+    fs: &FsReadCap,
+    proc_cap: &ProcessCap,
+    env: &EnvCap,
+    args: List[String]
+) -> Result[Int, String] {
+    let opts: B58Opts = parse_b58_args(args);
 
-fn main(args: List[String]) -> Int {
-    let num_args: Int = list_len(args);
-    let mut i: Int = 0;
-
-    while i < num_args {
-        let arg: String = list_get(args, i);
-        if arg == "-h" || arg == "--help" {
-            print(render_help());
-            return 0;
-        }
-        if arg == "-v" || arg == "--version" {
-            print(render_version());
-            return 0;
-        }
-        if arg == "--mcp" {
-            print("{\"jsonrpc\":\"2.0\",\"result\":{\"status\":\"ready\",\"tool\":\"oobase58\"}}\n");
-            return 0;
-        }
-        i = i + 1;
+    if opts.action == "help" {
+        print(render_help());
+        return Ok(0);
+    }
+    if opts.action == "version" {
+        println("oobase58 0.2.0 (openOODA sovereign data & streaming)");
+        return Ok(0);
+    }
+    if opts.action == "mcp" {
+        run_mcp_server(fs);
+        return Ok(0);
     }
 
-    print("oobase58: sovereign capability-bounded utility ready\n");
-    return 0;
+    let mut payload: String = opts.input_text;
+    if chars_len(payload) == 0 && chars_len(opts.file_path) > 0 {
+        let f_res: Result[String, String] = read_file(fs, opts.file_path);
+        if f_res.is_ok() {
+            payload = match f_res { Ok(s) => s, Err(_) => "" };
+        } else {
+            let err_text: String = "oobase58: error reading " + opts.file_path;
+            if opts.json_mode {
+                println(render_decode_json(opts.file_path, "", opts.alphabet, false, err_text));
+            } else {
+                println(err_text);
+            }
+            return Ok(1);
+        }
+    } else if chars_len(payload) == 0 {
+        let s_res: Result[String, String] = oo_read_stdin_chunk(fs, 65536);
+        if s_res.is_ok() {
+            payload = match s_res { Ok(s) => s, Err(_) => "" };
+        }
+    }
+
+    if opts.mode == "decode" {
+        let d_res: Result[String, String] = b58_decode_stream(payload, opts.alphabet);
+        if d_res.is_ok() {
+            let decoded: String = match d_res { Ok(s) => s, Err(_) => "" };
+            if opts.json_mode {
+                println(render_decode_json(payload, decoded, opts.alphabet, true, ""));
+            } else {
+                print(decoded);
+            }
+            return Ok(0);
+        } else {
+            let err_msg: String = match d_res { Ok(_) => "", Err(e) => e };
+            if opts.json_mode {
+                println(render_decode_json(payload, "", opts.alphabet, false, err_msg));
+            } else {
+                println("oobase58: " + err_msg);
+            }
+            return Ok(1);
+        }
+    }
+
+    let encoded: String = b58_encode_stream(payload, opts.alphabet, opts.wrap_cols);
+    if opts.json_mode {
+        println(render_encode_json(payload, encoded, opts.alphabet));
+    } else {
+        println(encoded);
+    }
+    return Ok(0);
 }

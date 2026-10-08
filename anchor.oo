@@ -1,8 +1,8 @@
-// # oobase58 Root Anchor
+// # oobase58 Root Subsystem Anchor
 //
-// Logline: Top-level anchor re-exporting options, core logic, render, and ipc subsystems.
+// Logline: Sovereign Base58 encoder and decoder with Bitcoin, Ripple, and Flickr alphabet options.
 //
-// Setup: Pure shim re-exporting all oobase58 subsystem anchors.
+// Setup: Root barrel shim re-exporting options, core logic, render, and ipc subsystems.
 //
 // Beats:
 //   1. Re-export options parsing subsystem.
@@ -10,4 +10,14 @@
 //   3. Re-export render formatting subsystem.
 //   4. Re-export Model Context Protocol (MCP) IPC subsystem.
 
-import "main.oo";
+import "core/anchor.oo";
+import "render/anchor.oo";
+import "ipc/anchor.oo";
+
+pub fn oobase58_version() -> String {
+    return "0.2.0";
+}
+
+pub fn oobase58_banner() -> String {
+    return "oobase58 v0.2.0 (openOODA sovereign data & streaming)";
+}

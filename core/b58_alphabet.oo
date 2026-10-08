@@ -1,0 +1,45 @@
+// # oobase58 Alphabet and Character Mapping Tables
+//
+// Logline: Alphabet definitions and index lookups for Bitcoin, Ripple, and Flickr Base58.
+//
+// Setup: Pure string tables mapping 0..57 indices to character glyphs and reverse search.
+//
+// Beats:
+//   1. Expose Bitcoin standard, Ripple, and Flickr Base58 alphabet strings.
+//   2. Translate integer indices (0..57) to target alphabet characters.
+//   3. Lookup character positions in alphabet with rejection of ambiguous glyphs.
+
+pub fn alphabet_bitcoin() -> String {
+    return "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
+}
+
+pub fn alphabet_ripple() -> String {
+    return "rpshnaf39wBUDNEGHJKLM4PQRST7VWXYZ2bcdeCg65jkm8oFqi1tuvAxyz";
+}
+
+pub fn alphabet_flickr() -> String {
+    return "123456789abcdefghijkmnopqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ";
+}
+
+pub fn get_alphabet(name: String) -> String {
+    if name == "ripple" {
+        return alphabet_ripple();
+    }
+    if name == "flickr" {
+        return alphabet_flickr();
+    }
+    return alphabet_bitcoin();
+}
+
+pub fn b58_char_at(alphabet_name: String, idx: Int) -> String {
+    if idx < 0 || idx > 57 {
+        return "";
+    }
+    let alpha: String = get_alphabet(alphabet_name);
+    return char_at(alpha, idx);
+}
+
+pub fn b58_val_of(alphabet_name: String, c: String) -> Int {
+    let alpha: String = get_alphabet(alphabet_name);
+    return str_index_of(alpha, c);
+}

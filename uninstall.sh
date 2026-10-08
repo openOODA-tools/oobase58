@@ -4,7 +4,7 @@
 # "Removes oobase58 binary, package installations, and cache."
 #
 # Usage:
-#   curl -fsSL https://openooda-toobase58.github.io/oobase58/uninstall.sh | bash
+#   curl -fsSL https://openooda-tools.github.io/oobase58/uninstall.sh | bash
 #   or: ./uninstall.sh [options]
 #
 # Options:

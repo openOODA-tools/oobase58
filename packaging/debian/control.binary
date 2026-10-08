@@ -1,0 +1,11 @@
+Package: oobase58
+Version: 0.2.0-1
+Section: utils
+Priority: optional
+Architecture: amd64
+Maintainer: openOODA-tools <ops@openooda.org>
+Depends: libc6
+Description: BASE58 ENCODER
+ Cryptographic Base58 encoder and decoder omitting ambiguous alphanumeric glyphs.
+ Capability-bounded openOODA utility with zero ambient authority,
+ oote theme palettes, and native Model Context Protocol (MCP) surface.

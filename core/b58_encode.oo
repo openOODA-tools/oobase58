@@ -1,0 +1,89 @@
+// # oobase58 Encoding Engine
+//
+// Logline: Encodes arbitrary byte sequences into Base58 text with leading zero preservation and column wrapping.
+//
+// Setup: Pure arbitrary-precision big-endian base-256 to base-58 conversion engine.
+//
+// Beats:
+//   1. Count leading zero bytes in raw input sequence.
+//   2. Accumulate bytes into base-58 digit array via Horner polynomial arithmetic.
+//   3. Prepend leading zero symbol equivalents and reverse emit Base58 string.
+
+import "core/b58_alphabet.oo";
+
+pub fn b58_wrap_lines(text: String, wrap_cols: Int) -> String {
+    if wrap_cols <= 0 {
+        return text;
+    }
+    let n: Int = chars_len(text);
+    if n <= wrap_cols {
+        return text;
+    }
+    let mut out: String = "";
+    let mut i: Int = 0;
+    while i < n {
+        if i > 0 && (i % wrap_cols) == 0 {
+            out = out + "\n";
+        }
+        out = out + char_at(text, i);
+        i = i + 1;
+    }
+    return out;
+}
+
+pub fn b58_encode_stream(s: String, alphabet: String, wrap_cols: Int) -> String {
+    let blen: Int = bytes_len(s);
+    if blen == 0 {
+        return "";
+    }
+
+    let mut leading_zeros: Int = 0;
+    let mut scanning_zeros: Bool = true;
+    let mut i: Int = 0;
+    while i < blen && scanning_zeros {
+        if byte_at(s, i) == 0 {
+            leading_zeros = leading_zeros + 1;
+        } else {
+            scanning_zeros = false;
+        }
+        i = i + 1;
+    }
+
+    let mut digits: List[Int] = list_new();
+    let mut k: Int = 0;
+    while k < blen {
+        let b: Int = byte_at(s, k);
+        let mut carry: Int = b;
+        let mut j: Int = 0;
+        let dlen: Int = list_len(digits);
+        while j < dlen {
+            let acc: Int = (list_get(digits, j) * 256) + carry;
+            digits = list_set(digits, j, acc % 58);
+            carry = acc / 58;
+            j = j + 1;
+        }
+        while carry > 0 {
+            digits = list_push(digits, carry % 58);
+            carry = carry / 58;
+        }
+        k = k + 1;
+    }
+
+    let mut out: String = "";
+    let zero_char: String = b58_char_at(alphabet, 0);
+    let mut z: Int = 0;
+    while z < leading_zeros {
+        out = out + zero_char;
+        z = z + 1;
+    }
+
+    let total_digits: Int = list_len(digits);
+    let mut d_idx: Int = total_digits - 1;
+    while d_idx >= 0 {
+        let digit_val: Int = list_get(digits, d_idx);
+        out = out + b58_char_at(alphabet, digit_val);
+        d_idx = d_idx - 1;
+    }
+
+    return b58_wrap_lines(out, wrap_cols);
+}

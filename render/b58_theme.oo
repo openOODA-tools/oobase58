@@ -1,0 +1,67 @@
+// # oobase58 Rendering and JSON Formatter
+//
+// Logline: Formats Base58 encoding and decoding results for terminal output and structured JSON.
+//
+// Setup: Pure string formatter supporting oote styling and JSON envelope serialization.
+//
+// Beats:
+//   1. Provide ANSI styling helpers for terminal diagnostics and status tags.
+//   2. Serialize successful Base58 encoding operations into structured JSON objects.
+//   3. Serialize decoding outputs and error diagnostics into structured JSON objects.
+
+pub fn ansi_reset() -> String { return "\x1b[0m"; }
+pub fn ansi_bold() -> String { return "\x1b[1m"; }
+pub fn ansi_dim() -> String { return "\x1b[2m"; }
+pub fn ansi_cyan() -> String { return "\x1b[36m"; }
+pub fn ansi_green() -> String { return "\x1b[32m"; }
+pub fn ansi_yellow() -> String { return "\x1b[33m"; }
+pub fn ansi_red() -> String { return "\x1b[31m"; }
+
+fn json_escape(s: String) -> String {
+    let mut out: String = "";
+    let n: Int = chars_len(s);
+    let mut i: Int = 0;
+    while i < n {
+        let c: String = char_at(s, i);
+        if c == "\\" {
+            out = out + "\\\\";
+        } else if c == "\"" {
+            out = out + "\\\"";
+        } else if c == "\n" {
+            out = out + "\\n";
+        } else if c == "\r" {
+            out = out + "\\r";
+        } else if c == "\t" {
+            out = out + "\\t";
+        } else {
+            out = out + c;
+        }
+        i = i + 1;
+    }
+    return out;
+}
+
+pub fn render_encode_json(input: String, output: String, alphabet: String) -> String {
+    let bin: Int = bytes_len(input);
+    let bout: Int = chars_len(output);
+    return "{\"operation\":\"encode\",\"alphabet\":\"" + json_escape(alphabet) + "\""
+        + ",\"bytes_in\":" + to_string(bin)
+        + ",\"chars_out\":" + to_string(bout)
+        + ",\"output\":\"" + json_escape(output) + "\"}";
+}
+
+pub fn render_decode_json(input: String, output: String, alphabet: String, is_ok: Bool, err_msg: String) -> String {
+    let bin: Int = chars_len(input);
+    let bout: Int = bytes_len(output);
+    if is_ok {
+        return "{\"operation\":\"decode\",\"alphabet\":\"" + json_escape(alphabet) + "\""
+            + ",\"chars_in\":" + to_string(bin)
+            + ",\"bytes_out\":" + to_string(bout)
+            + ",\"valid\":true"
+            + ",\"output\":\"" + json_escape(output) + "\"}";
+    }
+    return "{\"operation\":\"decode\",\"alphabet\":\"" + json_escape(alphabet) + "\""
+        + ",\"chars_in\":" + to_string(bin)
+        + ",\"valid\":false"
+        + ",\"error\":\"" + json_escape(err_msg) + "\"}";
+}

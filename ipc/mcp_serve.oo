@@ -1,0 +1,113 @@
+// # Model Context Protocol (MCP) Stdio Server for oobase58
+//
+// Logline: JSON-RPC 2.0 stdio server providing Base58 encoding, decoding, and alphabet tools.
+//
+// Setup: Demands FsReadCap for stdio streaming. Operates without ambient authority.
+//
+// Beats:
+//   1. Ingest JSON-RPC 2.0 frames over stdin and dispatch RPC methods.
+//   2. Advertise Base58 encoding, decoding, and alphabet inspection tools.
+//   3. Execute capability-bounded codecs and stream JSON responses.
+
+import "core/b58_encode.oo";
+import "core/b58_decode.oo";
+import "render/b58_theme.oo";
+import "ipc/json_field.oo";
+import "ipc/b58_opts.oo";
+
+pub fn run_mcp_server(fs: &FsReadCap) {
+    let mut running: Bool = true;
+    while running {
+        let line_res: Result[String, String] = oo_read_stdin_chunk(fs, 8192);
+        if !line_res.is_ok() {
+            running = false;
+        } else {
+            let line: String = match line_res { Ok(s) => s, Err(_) => "" };
+            let trimmed: String = str_trim(line);
+            if chars_len(trimmed) == 0 {
+                running = false;
+            } else {
+                let id: String = json_get_field(trimmed, "id");
+                let method: String = json_get_string(trimmed, "method");
+
+                if method == "initialize" {
+                    let resp: String = "{\"jsonrpc\":\"2.0\",\"id\":" + id +
+                        ",\"result\":{\"protocolVersion\":\"2024-11-05\"," +
+                        "\"serverInfo\":{\"name\":\"oobase58\",\"version\":\"0.2.0\"}," +
+                        "\"capabilities\":{\"tools\":{}}}}";
+                    println(resp);
+                } else if method == "notifications/initialized" {
+                    // Ack
+                } else if method == "tools/list" {
+                    let t1: String = "{\"name\":\"b58_encode\",\"description\":\"Encode text into Base58 string\"," +
+                        "\"inputSchema\":{\"type\":\"object\",\"properties\":{\"text\":{\"type\":\"string\"},\"alphabet\":{\"type\":\"string\"},\"wrap\":{\"type\":\"integer\"}},\"required\":[\"text\"]}}";
+                    let t2: String = "{\"name\":\"b58_decode\",\"description\":\"Decode Base58 string back into original text\"," +
+                        "\"inputSchema\":{\"type\":\"object\",\"properties\":{\"encoded\":{\"type\":\"string\"},\"alphabet\":{\"type\":\"string\"}},\"required\":[\"encoded\"]}}";
+                    let t3: String = "{\"name\":\"b58_alphabets\",\"description\":\"List available Base58 alphabets (bitcoin, ripple, flickr)\"," +
+                        "\"inputSchema\":{\"type\":\"object\",\"properties\":{}}}";
+                    let t4: String = "{\"name\":\"b58_stats\",\"description\":\"Query Base58 codec engine specifications\"," +
+                        "\"inputSchema\":{\"type\":\"object\",\"properties\":{}}}";
+                    let resp: String = "{\"jsonrpc\":\"2.0\",\"id\":" + id +
+                        ",\"result\":{\"tools\":[" + t1 + "," + t2 + "," + t3 + "," + t4 + "]}}";
+                    println(resp);
+                } else if method == "tools/call" {
+                    let params: String = json_get_field(trimmed, "params");
+                    let tool_name: String = json_get_string(params, "name");
+                    let args: String = json_get_field(params, "arguments");
+
+                    if tool_name == "b58_encode" {
+                        let text_in: String = json_get_string(args, "text");
+                        let alpha_in: String = json_get_string(args, "alphabet");
+                        let wrap_str: String = json_get_field(args, "wrap");
+
+                        let alphabet: String = if chars_len(alpha_in) > 0 { alpha_in } else { "bitcoin" };
+                        let wrap: Int = if chars_len(wrap_str) > 0 { parse_int_str(wrap_str) } else { 0 };
+
+                        let encoded: String = b58_encode_stream(text_in, alphabet, wrap);
+                        let j: String = render_encode_json(text_in, encoded, alphabet);
+                        let resp: String = "{\"jsonrpc\":\"2.0\",\"id\":" + id +
+                            ",\"result\":{\"content\":[{\"type\":\"text\",\"text\":\"" + json_escape_string(j) + "\"}]}}";
+                        println(resp);
+                    } else if tool_name == "b58_decode" {
+                        let enc_in: String = json_get_string(args, "encoded");
+                        let alpha_in: String = json_get_string(args, "alphabet");
+                        let alphabet: String = if chars_len(alpha_in) > 0 { alpha_in } else { "bitcoin" };
+
+                        let d_res: Result[String, String] = b58_decode_stream(enc_in, alphabet);
+                        let mut j: String = "";
+                        if d_res.is_ok() {
+                            let dec_out: String = match d_res { Ok(s) => s, Err(_) => "" };
+                            j = render_decode_json(enc_in, dec_out, alphabet, true, "");
+                        } else {
+                            let err_msg: String = match d_res { Ok(_) => "", Err(e) => e };
+                            j = render_decode_json(enc_in, "", alphabet, false, err_msg);
+                        }
+                        let resp: String = "{\"jsonrpc\":\"2.0\",\"id\":" + id +
+                            ",\"result\":{\"content\":[{\"type\":\"text\",\"text\":\"" + json_escape_string(j) + "\"}]}}";
+                        println(resp);
+                    } else if tool_name == "b58_alphabets" {
+                        let j: String = "{\"alphabets\":[{\"name\":\"bitcoin\",\"symbols\":\"123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz\"}," +
+                            "{\"name\":\"ripple\",\"symbols\":\"rpshnaf39wBUDNEGHJKLM4PQRST7VWXYZ2bcdeCg65jkm8oFqi1tuvAxyz\"}," +
+                            "{\"name\":\"flickr\",\"symbols\":\"123456789abcdefghijkmnopqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ\"}]}";
+                        let resp: String = "{\"jsonrpc\":\"2.0\",\"id\":" + id +
+                            ",\"result\":{\"content\":[{\"type\":\"text\",\"text\":\"" + json_escape_string(j) + "\"}]}}";
+                        println(resp);
+                    } else if tool_name == "b58_stats" {
+                        let j: String = "{\"engine\":\"oobase58\",\"version\":\"0.2.0\",\"pure_native\":true,\"alphabets\":[\"bitcoin\",\"ripple\",\"flickr\"]}";
+                        let resp: String = "{\"jsonrpc\":\"2.0\",\"id\":" + id +
+                            ",\"result\":{\"content\":[{\"type\":\"text\",\"text\":\"" + json_escape_string(j) + "\"}]}}";
+                        println(resp);
+                    } else {
+                        let resp: String = "{\"jsonrpc\":\"2.0\",\"id\":" + id +
+                            ",\"error\":{\"code\":-32601,\"message\":\"Method not found\"}}";
+                        println(resp);
+                    }
+                } else {
+                    let resp: String = "{\"jsonrpc\":\"2.0\",\"id\":" + id +
+                        ",\"error\":{\"code\":-32601,\"message\":\"Method not found\"}}";
+                    println(resp);
+                }
+            }
+        }
+    }
+}
